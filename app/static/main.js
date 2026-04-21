@@ -121,6 +121,8 @@ L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
 const systemMessage = document.getElementById("systemMessage");
 const favoritesList = document.getElementById("favoritesList");
 const alertsFeed = document.getElementById("alertsFeed");
+const searchInput = document.getElementById("searchInput");
+const searchResults = document.getElementById("searchResults");
 
 const checkAlertsBtn = document.getElementById("checkAlertsBtn");
 const alertModal = document.getElementById("alertModal");
@@ -698,6 +700,99 @@ document.addEventListener("click", handlePopupAction);
 renderAlertSummary();
 updateFilterButtonsState();
 
+// ── Search Functionality ────────────────────────────────────────────────────
+function performSearch(query) {
+  if (!query.trim()) {
+    searchResults.classList.add("hidden");
+    searchResults.innerHTML = "";
+    return;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const results = [];
+  
+  stationCache.forEach((station) => {
+    const name = (station.brand_name || "").toLowerCase();
+    const addr = (station.address || "").toLowerCase();
+    
+    if (name.includes(lowerQuery) || addr.includes(lowerQuery)) {
+      results.push(station);
+    }
+  });
+
+  if (results.length === 0) {
+    searchResults.innerHTML = '<div class="search-result-item" style="color: var(--muted); text-align: center;">Tanklaid ei leitud</div>';
+    searchResults.classList.remove("hidden");
+    return;
+  }
+
+  // Sort by relevance: exact name match first, then address match
+  results.sort((a, b) => {
+    const aNameMatch = (a.brand_name || "").toLowerCase().includes(lowerQuery);
+    const bNameMatch = (b.brand_name || "").toLowerCase().includes(lowerQuery);
+    if (aNameMatch && !bNameMatch) return -1;
+    if (!aNameMatch && bNameMatch) return 1;
+    return 0;
+  });
+
+  searchResults.innerHTML = results
+    .slice(0, 8)
+    .map((station) => {
+      const diesel = station.prices?.diesel != null ? station.prices.diesel.toFixed(3) : "-";
+      const p95 = station.prices?.premium95 != null ? station.prices.premium95.toFixed(3) : "-";
+      const p98 = station.prices?.premium98 != null ? station.prices.premium98.toFixed(3) : "-";
+
+      return `
+        <div class="search-result-item" data-station-id="${station.id}">
+          <div class="search-result-name">${station.brand_name} - ${station.station_name}</div>
+          <div class="search-result-address">${station.address}</div>
+          <div class="search-result-prices">
+            <span class="search-result-price">D: ${diesel}€</span>
+            <span class="search-result-price">95: ${p95}€</span>
+            <span class="search-result-price">98: ${p98}€</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  searchResults.classList.remove("hidden");
+
+  // Add click handlers to results
+  searchResults.querySelectorAll(".search-result-item").forEach((item) => {
+    item.addEventListener("click", async () => {
+      const stationId = Number(item.dataset.stationId);
+      await openStationDetails(stationId, { openModal: false, focusMap: true });
+      searchInput.value = "";
+      searchResults.classList.add("hidden");
+      searchResults.innerHTML = "";
+    });
+  });
+}
+
+// Close search results when clicking outside
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("#searchContainer")) {
+    searchResults.classList.add("hidden");
+  }
+});
+
+// Search input listener with debounce
+let searchTimeout;
+searchInput.addEventListener("input", (event) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    performSearch(event.target.value);
+  }, 200);
+});
+
+// Allow clicking search container without closing
+searchInput.addEventListener("focus", (event) => {
+  if (event.target.value.trim()) {
+    performSearch(event.target.value);
+  }
+});
+
 // Load server favorites + alert targets if logged in, then start app
 async function initApp() {
   if (ffToken) {
@@ -730,8 +825,18 @@ async function initApp() {
       }
     } catch {}
   }
-  fetchStations();
+  
+  // Fetch stations immediately with default location
+  await fetchStations();
+  
+  // Then try to get user's actual location and refresh
   locateUser();
 }
 
-initApp();
+// Initialize app when DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  // DOM is already ready
+  initApp();
+}
