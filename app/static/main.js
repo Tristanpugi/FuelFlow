@@ -326,8 +326,11 @@ async function saveAlertTargets() {
       }),
     });
     if (!res.ok) {
-      throw new Error("alert-target-save-failed");
+      const errorText = await res.text();
+      throw new Error(`alert-target-save-failed: ${res.status} ${errorText}`);
     }
+  } else {
+    throw new Error("Pead olema sisse logitud hinnateavituse salvestamiseks.");
   }
 }
 
@@ -544,11 +547,15 @@ async function handleAlertTargetsSubmit(event) {
   try {
     await saveAlertTargets();
     alertModalResult.textContent = "Sihthinnad salvestatud.";
+    alertModalResult.style.color = "#0f6fff";
     renderAlertSummary();
     closeAlertModal();
     fetchStations();
-  } catch {
-    alertModalResult.textContent = "Sihthindade salvestamine ebaõnnestus. Proovi uuesti.";
+  } catch (error) {
+    console.error("Alert save error:", error);
+    const message = error.message || "Sihthindade salvestamine ebaõnnestus.";
+    alertModalResult.textContent = message;
+    alertModalResult.style.color = "#dc2626";
   }
 }
 

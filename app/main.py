@@ -328,6 +328,64 @@ def normalize_brand(raw_brand: str) -> str | None:
     return None
 
 
+def normalize_station_name(raw_name: str, brand: str, city: str) -> str:
+    """Normalize station name to proper title case."""
+    if not raw_name or not raw_name.strip():
+        return f"{brand} {city}"
+    
+    name = raw_name.strip()
+    # Title case: capitalize each word
+    words = []
+    for word in name.split():
+        # Keep brand names properly cased
+        if word.lower() in {"circle", "k", "alexela", "olerex", "neste"}:
+            if word.lower() == "circle":
+                words.append("Circle")
+            elif word.lower() == "k":
+                words.append("K")
+            else:
+                words.append(word.capitalize())
+        else:
+            words.append(word.capitalize())
+    
+    return " ".join(words)
+
+
+def normalize_address(raw_address: str) -> str:
+    """Normalize address to proper title case with Estonian characters."""
+    if not raw_address or not raw_address.strip():
+        return raw_address
+    
+    # Common Estonian locations that should be title-cased correctly
+    replacements = {
+        "tartu": "Tartu",
+        "tallinn": "Tallinn",
+        "pärnu": "Pärnu",
+        "parnu": "Pärnu",
+        "mustamäe": "Mustamäe",
+        "mustamae": "Mustamäe",
+        "lasnamäe": "Lasnamäe",
+        "lasnamae": "Lasnamäe",
+        "jüri": "Jüri",
+        "juri": "Jüri",
+        "kesklinn": "Kesklinn",
+    }
+    
+    address = raw_address.strip()
+    
+    # Normalize each word
+    words = []
+    for word in address.split():
+        lower = word.lower()
+        if lower in replacements:
+            words.append(replacements[lower])
+        else:
+            # Capitalize first letter
+            words.append(word[0].upper() + word[1:] if len(word) > 0 else word)
+    
+    return " ".join(words)
+
+
 def fetch_estonia_brand_stations() -> list[tuple[str, str, str, str, float, float, int]]:
     query = """
 [out:json][timeout:40];
@@ -376,7 +434,9 @@ out center tags;
         street = tags.get("addr:street", "")
         house_number = tags.get("addr:housenumber", "")
         address = f"{street} {house_number}".strip() or city
-        station_name = tags.get("name") or f"{brand} {city}"
+        address = normalize_address(address)
+        raw_station_name = tags.get("name") or f"{brand} {city}"
+        station_name = normalize_station_name(raw_station_name, brand, city)
         is_partner_verified = 1 if brand in {"Circle K", "Alexela", "Neste"} else 0
         stations.append((brand, station_name, address, city, float(lat), float(lng), is_partner_verified))
 
@@ -386,13 +446,13 @@ out center tags;
 def demo_fallback_stations() -> list[tuple[str, str, str, str, float, float, int]]:
     return [
         ("Circle K", "Circle K Kesklinn", "Narva mnt 2", "Tallinn", 59.4373, 24.7536, 1),
-        ("Alexela", "Alexela Mustamae", "Akadeemia tee 31", "Tallinn", 59.4078, 24.6863, 1),
-        ("Olerex", "Olerex Lasnamae", "Peterburi tee 71", "Tallinn", 59.4340, 24.8478, 0),
+        ("Alexela", "Alexela Mustamäe", "Akadeemia tee 31", "Tallinn", 59.4078, 24.6863, 1),
+        ("Olerex", "Olerex Lasnamäe", "Peterburi tee 71", "Tallinn", 59.4340, 24.8478, 0),
         ("Neste", "Neste Tallinn", "Smuuli tee 4", "Tallinn", 59.4395, 24.8073, 1),
-        ("Circle K", "Circle K Tartu", "Riia 2", "Tartu", 58.3776, 26.7290, 1),
+        ("Circle K", "Circle K Jüri", "Riia 2", "Tartu", 58.3776, 26.7290, 1),
         ("Alexela", "Alexela Tartu", "Turu 45", "Tartu", 58.3691, 26.7476, 0),
-        ("Olerex", "Olerex Parnu", "Tallinna mnt 82", "Parnu", 58.3859, 24.4971, 0),
-        ("Neste", "Neste Parnu", "Papiniidu 50", "Parnu", 58.3672, 24.5095, 1),
+        ("Olerex", "Olerex Pärnu", "Tallinna mnt 82", "Pärnu", 58.3859, 24.4971, 0),
+        ("Neste", "Neste Pärnu", "Papiniidu 50", "Pärnu", 58.3672, 24.5095, 1),
     ]
 
 
