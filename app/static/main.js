@@ -327,11 +327,12 @@ async function saveAlertTargets() {
     });
     if (!res.ok) {
       const errorText = await res.text();
-      throw new Error(`alert-target-save-failed: ${res.status} ${errorText}`);
+      console.error("Alert targets sync failed:", res.status, errorText);
+      return false;
     }
-  } else {
-    throw new Error("Pead olema sisse logitud hinnateavituse salvestamiseks.");
+    return true;
   }
+  return true;
 }
 
 function renderAlertSummary() {
@@ -545,8 +546,10 @@ async function handleAlertTargetsSubmit(event) {
     premium98: parseTargetValue(target98Input.value),
   };
   try {
-    await saveAlertTargets();
-    alertModalResult.textContent = "Sihthinnad salvestatud.";
+    const synced = await saveAlertTargets();
+    alertModalResult.textContent = synced
+      ? "Sihthinnad salvestatud."
+      : "Sihthinnad salvestatud lokaalselt (serveri sünk ebaõnnestus).";
     alertModalResult.style.color = "#0f6fff";
     renderAlertSummary();
     closeAlertModal();
