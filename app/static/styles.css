@@ -79,6 +79,11 @@ body {
   background: #f3f4f6;
 }
 
+.menu-link-btn.is-active {
+  color: #fff;
+  background: var(--accent-2);
+}
+
 .refresh-btn {
   margin-left: 0.5rem;
 }

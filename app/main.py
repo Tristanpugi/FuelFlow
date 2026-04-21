@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 import psycopg
+import bcrypt
 from psycopg.rows import dict_row
 from fastapi import FastAPI, Header, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "fuelflow.db"
@@ -35,7 +35,6 @@ SECRET_KEY = os.environ.get("JWT_SECRET", secrets.token_hex(32))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
 
 # Google OAuth (optional — set env vars to enable)
@@ -186,11 +185,17 @@ def get_conn() -> DBConnection:
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # Use bcrypt directly to avoid passlib+bcrypt runtime compatibility issues.
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+def verify_password(plain: str, hashed: str | None) -> bool:
+    if not hashed:
+        return False
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def create_access_token(account_id: int) -> str:
@@ -389,15 +394,6 @@ def demo_fallback_stations() -> list[tuple[str, str, str, str, float, float, int
         ("Olerex", "Olerex Parnu", "Tallinna mnt 82", "Parnu", 58.3859, 24.4971, 0),
         ("Neste", "Neste Parnu", "Papiniidu 50", "Parnu", 58.3672, 24.5095, 1),
     ]
-
-
-def generated_prices(lat: float, lng: float) -> tuple[float, float, float]:
-    # Generate stable demo prices from coordinates so every station has a value.
-    variation = abs((lat * 1000 + lng * 700) % 11) / 1000
-    diesel = round(1.569 + variation, 3)
-    e10 = round(diesel + 0.04, 3)
-    premium95 = round(e10 + 0.06, 3)
-    return diesel, e10, premium95
 
 
 def create_sqlite_schema(conn: DBConnection) -> None:
@@ -632,8 +628,9 @@ def init_db() -> None:
     station_count = conn.execute("SELECT COUNT(*) as c FROM stations").fetchone()["c"]
     brand_rows = conn.execute("SELECT DISTINCT brand_name FROM stations").fetchall()
     existing_brands = {row["brand_name"] for row in brand_rows}
-    if existing_brands != ESTONIA_BRANDS or station_count < 30:
-        # Re-seed demo data so the app is Estonia-only and brand-restricted.
+    has_unexpected_brands = any(brand not in ESTONIA_BRANDS for brand in existing_brands)
+    if station_count == 0 or not existing_brands or has_unexpected_brands:
+        # Seed stations only when the database is empty or contains incompatible data.
         conn.execute("DELETE FROM price_confirmations")
         conn.execute("DELETE FROM price_reports")
         conn.execute("DELETE FROM station_prices")
@@ -661,22 +658,17 @@ def init_db() -> None:
             if brand not in first_partner_station:
                 first_partner_station[brand] = station_id
 
-            diesel, e10, premium95 = generated_prices(lat, lng)
-            conn.executemany(
-                "INSERT INTO station_prices (station_id, fuel_type, price, updated_at) VALUES (?, ?, ?, ?)",
-                [
-                    (station_id, "diesel", diesel, now_iso()),
-                    (station_id, "e10", e10, now_iso()),
-                    (station_id, "premium95", premium95, now_iso()),
-                ],
-            )
-
         for brand, station_id in first_partner_station.items():
             key_value = f"partner-{brand.lower().replace(' ', '')}-demo-key"
             conn.execute(
                 "INSERT INTO partner_keys (station_id, api_key) VALUES (?, ?)",
                 (station_id, key_value),
             )
+
+    report_count = conn.execute("SELECT COUNT(*) as c FROM price_reports").fetchone()["c"]
+    if report_count == 0:
+        # Keep prices empty until users/partners submit the first reports.
+        conn.execute("DELETE FROM station_prices")
 
     conn.commit()
     conn.close()
@@ -805,7 +797,8 @@ def google_callback(code: str = Query(...)) -> RedirectResponse:
         conn.commit()
     conn.close()
     token = create_access_token(row["id"])
-    return RedirectResponse(f"/?token={token}&name={row['name']}")
+    params = urlencode({"token": token, "name": row["name"], "email": row["email"]})
+    return RedirectResponse(f"/?{params}")
 
 
 # ── Favorites (server-side) ───────────────────────────────────────────────────

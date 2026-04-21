@@ -1,6 +1,64 @@
 // ── Auth ─────────────────────────────────────────────────────────────────────
 const ffToken = localStorage.getItem("ff-token");
 const ffUserName = localStorage.getItem("ff-user-name");
+const ffUserEmail = localStorage.getItem("ff-user-email");
+
+const favoriteOwnerKey = (ffUserEmail || ffUserName || "guest").trim().toLowerCase();
+const favoritesStorageKey = `fuel-favorites:${favoriteOwnerKey}`;
+const alertTargetsStorageKey = `fuel-alert-targets:${favoriteOwnerKey}`;
+
+function loadFavoritesFromStorage() {
+  try {
+    const scopedRaw = localStorage.getItem(favoritesStorageKey);
+    const legacyRaw = localStorage.getItem("fuel-favorites");
+    const scoped = JSON.parse(scopedRaw ?? "[]");
+    const legacy = JSON.parse(legacyRaw ?? "[]");
+    const scopedIds = Array.isArray(scoped) ? scoped : [];
+    const legacyIds = Array.isArray(legacy) ? legacy : [];
+    return [...new Set([...scopedIds, ...legacyIds])]
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+  } catch {
+    return [];
+  }
+}
+
+function normalizeAlertTargets(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const read = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+  return {
+    diesel: read(source.diesel),
+    premium95: read(source.premium95),
+    premium98: read(source.premium98),
+  };
+}
+
+function loadAlertTargetsFromStorage() {
+  try {
+    const scopedRaw = localStorage.getItem(alertTargetsStorageKey);
+    const legacyRaw = localStorage.getItem("fuel-alert-targets");
+    const scoped = normalizeAlertTargets(JSON.parse(scopedRaw ?? "{}"));
+    const legacy = normalizeAlertTargets(JSON.parse(legacyRaw ?? "{}"));
+    return {
+      diesel: scoped.diesel ?? legacy.diesel,
+      premium95: scoped.premium95 ?? legacy.premium95,
+      premium98: scoped.premium98 ?? legacy.premium98,
+    };
+  } catch {
+    return { diesel: null, premium95: null, premium98: null };
+  }
+}
+
+function hasAnyAlertTarget(targets) {
+  return Boolean(targets.diesel || targets.premium95 || targets.premium98);
+}
+
+function alertTargetsChanged(a, b) {
+  return a.diesel !== b.diesel || a.premium95 !== b.premium95 || a.premium98 !== b.premium98;
+}
 
 function authHeaders() {
   return ffToken ? { Authorization: `Bearer ${ffToken}` } : {};
@@ -12,6 +70,7 @@ function authHeaders() {
   if (params.has("token")) {
     localStorage.setItem("ff-token", params.get("token"));
     localStorage.setItem("ff-user-name", params.get("name") || "");
+    localStorage.setItem("ff-user-email", params.get("email") || "");
     window.history.replaceState({}, "", "/");
     window.location.reload();
   }
@@ -22,6 +81,8 @@ const userMenu = document.getElementById("userMenu");
 const userNameLabel = document.getElementById("userNameLabel");
 const loginLink = document.getElementById("loginLink");
 const logoutBtn = document.getElementById("logoutBtn");
+const favoritesFilterBtn = document.getElementById("favoritesFilterBtn");
+const alertFilterBtn = document.getElementById("alertFilterBtn");
 
 if (ffToken && ffUserName) {
   userMenu.classList.remove("hidden");
@@ -33,6 +94,10 @@ if (ffToken && ffUserName) {
 }
 
 logoutBtn.addEventListener("click", () => {
+  const confirmLogout = window.confirm("Kas soovid kindlasti välja logida?");
+  if (!confirmLogout) {
+    return;
+  }
   localStorage.removeItem("ff-token");
   localStorage.removeItem("ff-user-name");
   localStorage.removeItem("ff-user-email");
@@ -57,7 +122,6 @@ const systemMessage = document.getElementById("systemMessage");
 const favoritesList = document.getElementById("favoritesList");
 const alertsFeed = document.getElementById("alertsFeed");
 
-const openAlertModalBtn = document.getElementById("openAlertModalBtn");
 const checkAlertsBtn = document.getElementById("checkAlertsBtn");
 const alertModal = document.getElementById("alertModal");
 const closeAlertModalBtn = document.getElementById("closeAlertModalBtn");
@@ -83,9 +147,10 @@ const favoritesPanel = document.getElementById("lemmikud");
 const markers = new Map();
 const stationCache = new Map();
 let selectedStationDetails = null;
+let activeMapFilter = "all";
 
-const favorites = new Set(JSON.parse(localStorage.getItem("fuel-favorites") || "[]"));
-let alertTargets = JSON.parse(localStorage.getItem("fuel-alert-targets") || "{}");
+const favorites = new Set(loadFavoritesFromStorage());
+let alertTargets = loadAlertTargetsFromStorage();
 
 const userMarker = L.circleMarker([user.lat, user.lng], {
   radius: 8,
@@ -136,6 +201,34 @@ function hasPriceHit(station) {
   );
 }
 
+function stationMatchesActiveFilter(station) {
+  if (activeMapFilter === "favorites") {
+    return favorites.has(station.id);
+  }
+  if (activeMapFilter === "alerts") {
+    return hasPriceHit(station);
+  }
+  return true;
+}
+
+function updateFilterButtonsState() {
+  favoritesFilterBtn.classList.toggle("is-active", activeMapFilter === "favorites");
+  alertFilterBtn.classList.toggle("is-active", activeMapFilter === "alerts");
+  if (activeMapFilter === "favorites") {
+    systemMessage.textContent = "Kuvatakse ainult lemmiktanklaid.";
+  } else if (activeMapFilter === "alerts") {
+    systemMessage.textContent = "Kuvatakse ainult hinnateavituse tingimustele vastavaid tanklaid.";
+  } else {
+    systemMessage.textContent = "";
+  }
+}
+
+function toggleMapFilter(nextFilter) {
+  activeMapFilter = activeMapFilter === nextFilter ? "all" : nextFilter;
+  updateFilterButtonsState();
+  fetchStations();
+}
+
 function createStationIcon(station) {
   const style = brandStyle(station.brand_name);
   const badges = [];
@@ -155,24 +248,32 @@ function createStationIcon(station) {
 }
 
 function saveFavorites() {
-  localStorage.setItem("fuel-favorites", JSON.stringify([...favorites]));
+  const serialized = JSON.stringify([...favorites]);
+  localStorage.setItem(favoritesStorageKey, serialized);
+  localStorage.setItem("fuel-favorites", serialized);
 }
 
 async function syncFavoriteAdd(stationId) {
   if (!ffToken) return;
-  await fetch("/api/me/favorites", {
+  const res = await fetch("/api/me/favorites", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ station_id: stationId }),
   });
+  if (!res.ok) {
+    throw new Error("favorite-add-failed");
+  }
 }
 
 async function syncFavoriteRemove(stationId) {
   if (!ffToken) return;
-  await fetch(`/api/me/favorites/${stationId}`, {
+  const res = await fetch(`/api/me/favorites/${stationId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
+  if (!res.ok) {
+    throw new Error("favorite-remove-failed");
+  }
 }
 
 async function loadServerFavorites() {
@@ -181,16 +282,39 @@ async function loadServerFavorites() {
     const res = await fetch("/api/me/favorites", { headers: authHeaders() });
     if (!res.ok) return;
     const data = await res.json();
+
+    const serverIds = new Set(
+      data.map((station) => Number(station.id)).filter((id) => Number.isFinite(id) && id > 0)
+    );
+    const localIds = new Set([...favorites]);
+
+    const missingOnServer = [...localIds].filter((id) => !serverIds.has(id));
+    if (missingOnServer.length) {
+      await Promise.allSettled(missingOnServer.map((stationId) => syncFavoriteAdd(stationId)));
+    }
+
+    const latestRes = await fetch("/api/me/favorites", { headers: authHeaders() });
+    const latestServerIds = latestRes.ok
+      ? new Set(
+          (await latestRes.json())
+            .map((station) => Number(station.id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        )
+      : serverIds;
+
+    const mergedIds = new Set([...latestServerIds, ...localIds]);
     favorites.clear();
-    data.forEach((s) => favorites.add(s.id));
+    mergedIds.forEach((id) => favorites.add(id));
     saveFavorites();
   } catch {}
 }
 
-function saveAlertTargets() {
-  localStorage.setItem("fuel-alert-targets", JSON.stringify(alertTargets));
+async function saveAlertTargets() {
+  const serialized = JSON.stringify(alertTargets);
+  localStorage.setItem(alertTargetsStorageKey, serialized);
+  localStorage.setItem("fuel-alert-targets", serialized);
   if (ffToken) {
-    fetch("/api/me/alert-targets", {
+    const res = await fetch("/api/me/alert-targets", {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({
@@ -198,7 +322,10 @@ function saveAlertTargets() {
         premium95: alertTargets.premium95 || null,
         premium98: alertTargets.premium98 || null,
       }),
-    }).catch(() => {});
+    });
+    if (!res.ok) {
+      throw new Error("alert-target-save-failed");
+    }
   }
 }
 
@@ -352,6 +479,7 @@ async function fetchStations() {
   upsert(p98Stations, "premium98");
 
   const stations = [...merged.values()];
+  const visibleStations = stations.filter(stationMatchesActiveFilter);
 
   markers.forEach((marker) => map.removeLayer(marker));
   markers.clear();
@@ -359,6 +487,9 @@ async function fetchStations() {
 
   stations.forEach((station) => {
     stationCache.set(station.id, station);
+  });
+
+  visibleStations.forEach((station) => {
     const marker = L.marker([station.lat, station.lng], { icon: createStationIcon(station) }).addTo(map);
     marker.bindPopup('<div class="hint">Laen hindu...</div>', { autoPan: false });
     marker.on("click", async () => {
@@ -367,10 +498,16 @@ async function fetchStations() {
     markers.set(station.id, marker);
   });
 
-  if (stations.length && !mapBoundsSet) {
-    const bounds = L.latLngBounds(stations.map((station) => [station.lat, station.lng]));
+  if (visibleStations.length && !mapBoundsSet) {
+    const bounds = L.latLngBounds(visibleStations.map((station) => [station.lat, station.lng]));
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 });
     mapBoundsSet = true;
+  }
+
+  if (!visibleStations.length && activeMapFilter !== "all") {
+    systemMessage.textContent = activeMapFilter === "favorites"
+      ? "Lemmikute filtris pole veel ühtegi tanklat."
+      : "Hinnateavituse filtris pole ühtegi vastet.";
   }
 
   renderFavorites();
@@ -395,18 +532,22 @@ function locateUser() {
   );
 }
 
-function handleAlertTargetsSubmit(event) {
+async function handleAlertTargetsSubmit(event) {
   event.preventDefault();
   alertTargets = {
     diesel: parseTargetValue(targetDieselInput.value),
     premium95: parseTargetValue(target95Input.value),
     premium98: parseTargetValue(target98Input.value),
   };
-  saveAlertTargets();
-  alertModalResult.textContent = "Sihthinnad salvestatud.";
-  renderAlertSummary();
-  closeAlertModal();
-  fetchStations();
+  try {
+    await saveAlertTargets();
+    alertModalResult.textContent = "Sihthinnad salvestatud.";
+    renderAlertSummary();
+    closeAlertModal();
+    fetchStations();
+  } catch {
+    alertModalResult.textContent = "Sihthindade salvestamine ebaõnnestus. Proovi uuesti.";
+  }
 }
 
 async function saveStationPrices() {
@@ -454,15 +595,31 @@ async function toggleFavoriteFromModal() {
     return;
   }
   const id = selectedStationDetails.station.id;
-  if (favorites.has(id)) {
+  const wasFavorite = favorites.has(id);
+  if (wasFavorite) {
     favorites.delete(id);
-    await syncFavoriteRemove(id);
+    try {
+      await syncFavoriteRemove(id);
+    } catch {
+      favorites.add(id);
+      stationModalResult.textContent = "Lemmiku eemaldamine ebaõnnestus. Proovi uuesti.";
+      return;
+    }
   } else {
     favorites.add(id);
-    await syncFavoriteAdd(id);
+    saveFavorites();
+    try {
+      await syncFavoriteAdd(id);
+    } catch {
+      stationModalResult.textContent = "Lemmik salvestati kohalikult. Serverisse sünk proovitakse uuesti hiljem.";
+      updateFavoriteButtonText(id);
+      await fetchStations();
+      return;
+    }
   }
   saveFavorites();
   updateFavoriteButtonText(id);
+  stationModalResult.textContent = "";
   await fetchStations();
 }
 
@@ -484,12 +641,25 @@ async function handlePopupAction(event) {
   }
 
   if (action === "toggle-favorite") {
-    if (favorites.has(stationId)) {
+    const wasFavorite = favorites.has(stationId);
+    if (wasFavorite) {
       favorites.delete(stationId);
-      await syncFavoriteRemove(stationId);
+      try {
+        await syncFavoriteRemove(stationId);
+      } catch {
+        favorites.add(stationId);
+        return;
+      }
     } else {
       favorites.add(stationId);
-      await syncFavoriteAdd(stationId);
+      saveFavorites();
+      try {
+        await syncFavoriteAdd(stationId);
+      } catch {
+        await fetchStations();
+        await openStationDetails(stationId, { openModal: false, focusMap: false });
+        return;
+      }
     }
     saveFavorites();
     await fetchStations();
@@ -498,7 +668,8 @@ async function handlePopupAction(event) {
 }
 
 document.getElementById("refreshBtn").addEventListener("click", fetchStations);
-openAlertModalBtn.addEventListener("click", openAlertModal);
+favoritesFilterBtn.addEventListener("click", () => toggleMapFilter("favorites"));
+alertFilterBtn.addEventListener("click", () => toggleMapFilter("alerts"));
 checkAlertsBtn.addEventListener("click", openAlertModal);
 closeAlertModalBtn.addEventListener("click", closeAlertModal);
 alertTargetsForm.addEventListener("submit", handleAlertTargetsSubmit);
@@ -525,6 +696,7 @@ stationFavoriteBtn.addEventListener("click", toggleFavoriteFromModal);
 document.addEventListener("click", handlePopupAction);
 
 renderAlertSummary();
+updateFilterButtonsState();
 
 // Load server favorites + alert targets if logged in, then start app
 async function initApp() {
@@ -533,12 +705,28 @@ async function initApp() {
     try {
       const res = await fetch("/api/me/alert-targets", { headers: authHeaders() });
       if (res.ok) {
-        const data = await res.json();
-        if (data.diesel || data.premium95 || data.premium98) {
-          alertTargets = { diesel: data.diesel, premium95: data.premium95, premium98: data.premium98 };
-          localStorage.setItem("fuel-alert-targets", JSON.stringify(alertTargets));
-          renderAlertSummary();
+        const serverTargets = normalizeAlertTargets(await res.json());
+        const localTargets = normalizeAlertTargets(alertTargets);
+
+        const mergedTargets = {
+          diesel: serverTargets.diesel ?? localTargets.diesel,
+          premium95: serverTargets.premium95 ?? localTargets.premium95,
+          premium98: serverTargets.premium98 ?? localTargets.premium98,
+        };
+
+        if (hasAnyAlertTarget(mergedTargets) && alertTargetsChanged(serverTargets, mergedTargets)) {
+          await fetch("/api/me/alert-targets", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify(mergedTargets),
+          });
         }
+
+        alertTargets = mergedTargets;
+        const serialized = JSON.stringify(alertTargets);
+        localStorage.setItem(alertTargetsStorageKey, serialized);
+        localStorage.setItem("fuel-alert-targets", serialized);
+        renderAlertSummary();
       }
     } catch {}
   }
