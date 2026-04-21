@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 from fastapi import FastAPI, Header, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -593,14 +594,24 @@ def google_callback(code: str = Query(...)) -> RedirectResponse:
     )
     try:
         token_resp = json.loads(urlopen(token_req, timeout=10).read())
+    except HTTPError as exc:
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            error_detail = error_payload.get("error_description") or error_payload.get("error") or "Google token exchange ebaõnnestus"
+        except Exception:
+            error_detail = "Google token exchange ebaõnnestus"
+        raise HTTPException(status_code=400, detail=error_detail)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Google token exchange ebaõnnestus")
+
+    try:
         id_token_str = token_resp["id_token"]
-        # Decode without verification just to get claims (Google already validated)
-        claims = jwt.decode(id_token_str, options={"verify_signature": False})
+        claims = jwt.get_unverified_claims(id_token_str)
         google_id = claims["sub"]
         email = claims.get("email", "")
         name = claims.get("name", email.split("@")[0])
     except Exception:
-        raise HTTPException(status_code=400, detail="Google sisselogimine ebaõnnestus")
+        raise HTTPException(status_code=400, detail="Google ID tokeni lugemine ebaõnnestus")
 
     conn = get_conn()
     row = conn.execute("SELECT * FROM accounts WHERE google_id = ?", (google_id,)).fetchone()
