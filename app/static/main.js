@@ -10,12 +10,9 @@ const alertTargetsStorageKey = `fuel-alert-targets:${favoriteOwnerKey}`;
 function loadFavoritesFromStorage() {
   try {
     const scopedRaw = localStorage.getItem(favoritesStorageKey);
-    const legacyRaw = localStorage.getItem("fuel-favorites");
     const scoped = JSON.parse(scopedRaw ?? "[]");
-    const legacy = JSON.parse(legacyRaw ?? "[]");
     const scopedIds = Array.isArray(scoped) ? scoped : [];
-    const legacyIds = Array.isArray(legacy) ? legacy : [];
-    return [...new Set([...scopedIds, ...legacyIds])]
+    return [...new Set(scopedIds)]
       .map((id) => Number(id))
       .filter((id) => Number.isFinite(id) && id > 0);
   } catch {
@@ -39,17 +36,20 @@ function normalizeAlertTargets(raw) {
 function loadAlertTargetsFromStorage() {
   try {
     const scopedRaw = localStorage.getItem(alertTargetsStorageKey);
-    const legacyRaw = localStorage.getItem("fuel-alert-targets");
     const scoped = normalizeAlertTargets(JSON.parse(scopedRaw ?? "{}"));
-    const legacy = normalizeAlertTargets(JSON.parse(legacyRaw ?? "{}"));
     return {
-      diesel: scoped.diesel ?? legacy.diesel,
-      premium95: scoped.premium95 ?? legacy.premium95,
-      premium98: scoped.premium98 ?? legacy.premium98,
+      diesel: scoped.diesel,
+      premium95: scoped.premium95,
+      premium98: scoped.premium98,
     };
   } catch {
     return { diesel: null, premium95: null, premium98: null };
   }
+}
+
+function clearLegacySharedStorage() {
+  localStorage.removeItem("fuel-favorites");
+  localStorage.removeItem("fuel-alert-targets");
 }
 
 function hasAnyAlertTarget(targets) {
@@ -252,7 +252,6 @@ function createStationIcon(station) {
 function saveFavorites() {
   const serialized = JSON.stringify([...favorites]);
   localStorage.setItem(favoritesStorageKey, serialized);
-  localStorage.setItem("fuel-favorites", serialized);
 }
 
 async function syncFavoriteAdd(stationId) {
@@ -288,25 +287,9 @@ async function loadServerFavorites() {
     const serverIds = new Set(
       data.map((station) => Number(station.id)).filter((id) => Number.isFinite(id) && id > 0)
     );
-    const localIds = new Set([...favorites]);
 
-    const missingOnServer = [...localIds].filter((id) => !serverIds.has(id));
-    if (missingOnServer.length) {
-      await Promise.allSettled(missingOnServer.map((stationId) => syncFavoriteAdd(stationId)));
-    }
-
-    const latestRes = await fetch("/api/me/favorites", { headers: authHeaders() });
-    const latestServerIds = latestRes.ok
-      ? new Set(
-          (await latestRes.json())
-            .map((station) => Number(station.id))
-            .filter((id) => Number.isFinite(id) && id > 0)
-        )
-      : serverIds;
-
-    const mergedIds = new Set([...latestServerIds, ...localIds]);
     favorites.clear();
-    mergedIds.forEach((id) => favorites.add(id));
+    serverIds.forEach((id) => favorites.add(id));
     saveFavorites();
   } catch {}
 }
@@ -314,7 +297,6 @@ async function loadServerFavorites() {
 async function saveAlertTargets() {
   const serialized = JSON.stringify(alertTargets);
   localStorage.setItem(alertTargetsStorageKey, serialized);
-  localStorage.setItem("fuel-alert-targets", serialized);
   if (ffToken) {
     const res = await fetch("/api/me/alert-targets", {
       method: "PUT",
@@ -709,6 +691,7 @@ document.addEventListener("click", handlePopupAction);
 
 renderAlertSummary();
 updateFilterButtonsState();
+clearLegacySharedStorage();
 
 // ── Search Functionality ────────────────────────────────────────────────────
 function performSearch(query) {
@@ -811,26 +794,9 @@ async function initApp() {
       const res = await fetch("/api/me/alert-targets", { headers: authHeaders() });
       if (res.ok) {
         const serverTargets = normalizeAlertTargets(await res.json());
-        const localTargets = normalizeAlertTargets(alertTargets);
-
-        const mergedTargets = {
-          diesel: serverTargets.diesel ?? localTargets.diesel,
-          premium95: serverTargets.premium95 ?? localTargets.premium95,
-          premium98: serverTargets.premium98 ?? localTargets.premium98,
-        };
-
-        if (hasAnyAlertTarget(mergedTargets) && alertTargetsChanged(serverTargets, mergedTargets)) {
-          await fetch("/api/me/alert-targets", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json", ...authHeaders() },
-            body: JSON.stringify(mergedTargets),
-          });
-        }
-
-        alertTargets = mergedTargets;
+        alertTargets = serverTargets;
         const serialized = JSON.stringify(alertTargets);
         localStorage.setItem(alertTargetsStorageKey, serialized);
-        localStorage.setItem("fuel-alert-targets", serialized);
         renderAlertSummary();
       }
     } catch {}
