@@ -409,6 +409,21 @@ def normalize_address(raw_address: str) -> str:
     return " ".join(words)
 
 
+def normalize_station_display_fields(
+    brand_name: str | None,
+    station_name: str | None,
+    address: str | None,
+    city: str | None,
+) -> tuple[str, str, str, str]:
+    brand_raw = (brand_name or "").strip()
+    city_raw = (city or "").strip() or "Estonia"
+    normalized_brand = normalize_brand(brand_raw) or (brand_raw.title() if brand_raw else "Tankla")
+    normalized_city = normalize_address(city_raw)
+    normalized_station_name = normalize_station_name(station_name or "", normalized_brand, normalized_city)
+    normalized_address = normalize_address((address or "").strip() or normalized_city)
+    return normalized_brand, normalized_station_name, normalized_address, normalized_city
+
+
 def fetch_estonia_brand_stations() -> list[tuple[str, str, str, str, float, float, int]]:
     query = """
 [out:json][timeout:40];
@@ -916,7 +931,20 @@ def get_favorites(account: dict = Depends(require_account)) -> list[dict]:
         (account["id"],),
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+
+    favorites: list[dict] = []
+    for row in rows:
+        brand_name, station_name, address, city = normalize_station_display_fields(
+            row["brand_name"], row["station_name"], row["address"], row["city"]
+        )
+        favorite = dict(row)
+        favorite["brand_name"] = brand_name
+        favorite["station_name"] = station_name
+        favorite["address"] = address
+        favorite["city"] = city
+        favorites.append(favorite)
+
+    return favorites
 
 
 @app.post("/api/me/favorites")
@@ -1019,13 +1047,16 @@ def list_stations(
         distance = haversine_km(lat, lng, row["latitude"], row["longitude"])
         if distance > radius_km:
             continue
+        brand_name, station_name, address, city = normalize_station_display_fields(
+            row["brand_name"], row["station_name"], row["address"], row["city"]
+        )
         stations.append(
             {
                 "id": row["id"],
-                "brand_name": row["brand_name"],
-                "station_name": row["station_name"],
-                "address": row["address"],
-                "city": row["city"],
+                "brand_name": brand_name,
+                "station_name": station_name,
+                "address": address,
+                "city": city,
                 "lat": row["latitude"],
                 "lng": row["longitude"],
                 "is_partner_verified": bool(row["is_partner_verified"]),
@@ -1075,13 +1106,17 @@ def station_profile(station_id: int) -> dict[str, Any]:
     ).fetchall()
     conn.close()
 
+    brand_name, station_name, address, city = normalize_station_display_fields(
+        station["brand_name"], station["station_name"], station["address"], station["city"]
+    )
+
     return {
         "station": {
             "id": station["id"],
-            "brand_name": station["brand_name"],
-            "station_name": station["station_name"],
-            "address": station["address"],
-            "city": station["city"],
+            "brand_name": brand_name,
+            "station_name": station_name,
+            "address": address,
+            "city": city,
             "lat": station["latitude"],
             "lng": station["longitude"],
             "is_partner_verified": bool(station["is_partner_verified"]),
