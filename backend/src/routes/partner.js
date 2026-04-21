@@ -15,9 +15,6 @@ router.get('/dashboard', (req, res) => {
       ? db.prepare('SELECT * FROM stations').all()
       : db.prepare('SELECT * FROM stations WHERE partner_id = ?').all(req.user.id);
 
-    const now = new Date();
-    const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
-
     const stationsWithData = stations.map((station) => {
       const currentPrices = db
         .prepare('SELECT * FROM fuel_prices WHERE station_id = ? AND is_outdated = 0 ORDER BY created_at DESC')

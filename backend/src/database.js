@@ -124,7 +124,7 @@ if (stationCount.count === 0) {
     stationIds.push(res.lastInsertRowid);
   }
 
-  // Realistic 2024 Australian fuel prices (cents/L)
+// Seed data - prices are sample data representing typical 2024 Australian fuel prices (cents/L)
   const priceRanges = {
     unleaded: [180.5, 183.9, 187.4, 191.2, 185.7, 182.3, 188.9, 186.1, 190.4, 184.8],
     premium:  [202.5, 205.9, 209.4, 213.2, 207.7, 204.3, 210.9, 208.1, 212.4, 206.8],
