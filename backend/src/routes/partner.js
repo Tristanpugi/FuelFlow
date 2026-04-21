@@ -36,7 +36,7 @@ router.get('/dashboard', (req, res) => {
         if (week.length >= 2) {
           const oldest = week[0].price;
           const newest = week[week.length - 1].price;
-          trends[ft] = parseFloat((((newest - oldest) / oldest) * 100).toFixed(2));
+          trends[ft] = Math.round(((newest - oldest) / oldest) * 10000) / 100;
         } else {
           trends[ft] = null;
         }

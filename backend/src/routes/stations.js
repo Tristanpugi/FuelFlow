@@ -63,7 +63,7 @@ router.get('/', optionalAuth, (req, res) => {
     if (userLat !== null && userLng !== null) {
       stations = stations.map((s) => ({
         ...s,
-        distance_km: parseFloat(haversine(userLat, userLng, s.lat, s.lng).toFixed(2)),
+        distance_km: Math.round(haversine(userLat, userLng, s.lat, s.lng) * 100) / 100,
       }));
     }
 
@@ -120,7 +120,7 @@ router.get('/:id', optionalAuth, (req, res) => {
       if (week.length >= 2) {
         const oldest = week[0].price;
         const newest = week[week.length - 1].price;
-        trends[ft] = parseFloat((((newest - oldest) / oldest) * 100).toFixed(2));
+        trends[ft] = Math.round(((newest - oldest) / oldest) * 10000) / 100;
       } else {
         trends[ft] = null;
       }

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
-require('./database');
+const db = require('./database');
 
 const authRoutes = require('./routes/auth');
 const stationsRoutes = require('./routes/stations');
@@ -57,7 +57,6 @@ app.listen(PORT, () => {
   console.log(`FuelFlow backend running on port ${PORT}`);
 
   // Background job: mark prices older than 6 hours as outdated every 30 minutes
-  const db = require('./database');
   const markOutdated = () => {
     db.prepare(
       "UPDATE fuel_prices SET is_outdated = 1 WHERE created_at < datetime('now', '-6 hours') AND is_outdated = 0"
