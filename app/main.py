@@ -253,6 +253,29 @@ def ensure_user_alert_targets_schema(conn: DBConnection) -> None:
             raise
 
 
+def ensure_user_alert_targets_schema_v2(conn: DBConnection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_alert_targets_v2 (
+            account_id BIGINT PRIMARY KEY,
+            diesel REAL,
+            premium95 REAL,
+            premium98 REAL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+
+def resolve_alert_targets_table(conn: DBConnection) -> str:
+    try:
+        ensure_user_alert_targets_schema(conn)
+        return "user_alert_targets"
+    except Exception:
+        ensure_user_alert_targets_schema_v2(conn)
+        return "user_alert_targets_v2"
+
+
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     r = 6371.0
     p1 = math.radians(lat1)
@@ -783,6 +806,21 @@ def init_db() -> None:
                 (station_id, key_value),
             )
 
+    # Backfill prices for existing stations when station_prices is empty (legacy production DBs).
+    price_count = conn.execute("SELECT COUNT(*) as c FROM station_prices").fetchone()["c"]
+    if station_count > 0 and price_count == 0:
+        station_rows = conn.execute("SELECT id, latitude, longitude FROM stations").fetchall()
+        for station_row in station_rows:
+            diesel, e10, premium95 = generated_prices(station_row["latitude"], station_row["longitude"])
+            conn.executemany(
+                "INSERT INTO station_prices (station_id, fuel_type, price, updated_at) VALUES (?, ?, ?, ?)",
+                [
+                    (station_row["id"], "diesel", diesel, now_iso()),
+                    (station_row["id"], "e10", e10, now_iso()),
+                    (station_row["id"], "premium95", premium95, now_iso()),
+                ],
+            )
+
     conn.commit()
     conn.close()
 
@@ -980,9 +1018,9 @@ def remove_favorite(station_id: int, account: dict = Depends(require_account)) -
 @app.get("/api/me/alert-targets")
 def get_alert_targets(account: dict = Depends(require_account)) -> dict:
     conn = get_conn()
-    ensure_user_alert_targets_schema(conn)
+    table = resolve_alert_targets_table(conn)
     row = conn.execute(
-        "SELECT diesel, premium95, premium98 FROM user_alert_targets WHERE account_id = ?",
+        f"SELECT diesel, premium95, premium98 FROM {table} WHERE account_id = ?",
         (account["id"],),
     ).fetchone()
     conn.close()
@@ -994,26 +1032,26 @@ def get_alert_targets(account: dict = Depends(require_account)) -> dict:
 @app.put("/api/me/alert-targets")
 def set_alert_targets(body: UserAlertTargetsIn, account: dict = Depends(require_account)) -> dict:
     conn = get_conn()
-    ensure_user_alert_targets_schema(conn)
+    table = resolve_alert_targets_table(conn)
     existing = conn.execute(
-        "SELECT account_id FROM user_alert_targets WHERE account_id = ?",
+        f"SELECT account_id FROM {table} WHERE account_id = ?",
         (account["id"],),
     ).fetchone()
     if existing is None:
         conn.execute(
             """
-            INSERT INTO user_alert_targets (account_id, diesel, premium95, premium98, updated_at)
+            INSERT INTO {table} (account_id, diesel, premium95, premium98, updated_at)
             VALUES (?, ?, ?, ?, ?)
-            """,
+            """.replace("{table}", table),
             (account["id"], body.diesel, body.premium95, body.premium98, now_iso()),
         )
     else:
         conn.execute(
             """
-            UPDATE user_alert_targets
+            UPDATE {table}
             SET diesel = ?, premium95 = ?, premium98 = ?, updated_at = ?
             WHERE account_id = ?
-            """,
+            """.replace("{table}", table),
             (body.diesel, body.premium95, body.premium98, now_iso(), account["id"]),
         )
     conn.commit()
