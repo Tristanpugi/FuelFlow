@@ -2,17 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import * as api from '../services/api'
 
 const FUEL_TYPES = [
-  { label: 'Unleaded 91', value: 'U91' },
-  { label: 'Unleaded 95', value: 'U95' },
-  { label: 'Unleaded 98', value: 'U98' },
-  { label: 'Diesel', value: 'Diesel' },
-  { label: 'E10', value: 'E10' },
-  { label: 'LPG', value: 'LPG' },
+  { label: 'Unleaded', value: 'unleaded' },
+  { label: 'Premium', value: 'premium' },
+  { label: 'Diesel', value: 'diesel' },
+  { label: 'E10', value: 'e10' },
 ]
 
 export default function PriceSubmitModal({ stationId, onClose, onSuccess }) {
   const [stations, setStations] = useState([])
-  const [form, setForm] = useState({ stationId: stationId || '', fuelType: 'U91', price: '' })
+  const [form, setForm] = useState({ station_id: stationId || '', fuel_type: 'unleaded', price: '' })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -20,7 +18,7 @@ export default function PriceSubmitModal({ stationId, onClose, onSuccess }) {
   useEffect(() => {
     if (!stationId) {
       api.getStations({}).then(data => {
-        setStations(Array.isArray(data) ? data : data.stations || [])
+        setStations(data.data || [])
       }).catch(() => {})
     }
   }, [stationId])
@@ -40,7 +38,7 @@ export default function PriceSubmitModal({ stationId, onClose, onSuccess }) {
     setError('')
     setLoading(true)
     try {
-      await api.submitPrice({ stationId: form.stationId, fuelType: form.fuelType, price: Number(form.price) })
+      await api.submitPrice({ station_id: form.station_id, fuel_type: form.fuel_type, price: Number(form.price) })
       setSuccess(true)
       setTimeout(() => { onSuccess?.() }, 1500)
     } catch (err) {
@@ -62,17 +60,17 @@ export default function PriceSubmitModal({ stationId, onClose, onSuccess }) {
             {!stationId && (
               <div className="form-group">
                 <label>Station</label>
-                <select name="stationId" value={form.stationId} onChange={handleChange} required>
+                <select name="station_id" value={form.station_id} onChange={handleChange} required>
                   <option value="">Select station...</option>
                   {stations.map(s => (
-                    <option key={s._id || s.id} value={s._id || s.id}>{s.name}</option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
             )}
             <div className="form-group">
               <label>Fuel Type</label>
-              <select name="fuelType" value={form.fuelType} onChange={handleChange}>
+              <select name="fuel_type" value={form.fuel_type} onChange={handleChange}>
                 {FUEL_TYPES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
             </div>

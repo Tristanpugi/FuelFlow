@@ -1,8 +1,7 @@
 import './PriceCard.css'
 
 const FUEL_LABELS = {
-  U91: 'Unleaded 91', U95: 'Unleaded 95', U98: 'Unleaded 98',
-  Diesel: 'Diesel', E10: 'E10', LPG: 'LPG'
+  unleaded: 'Unleaded', premium: 'Premium', diesel: 'Diesel', e10: 'E10'
 }
 
 function timeAgo(dateStr) {
@@ -17,16 +16,17 @@ function timeAgo(dateStr) {
 }
 
 export default function PriceCard({ price, onVote }) {
-  const id = price._id || price.id
-  const confidence = Math.min(100, Math.max(0, price.confidence || 50))
+  const id = price.id
+  const total = price.confirmed_count + price.denied_count
+  const confidence = total > 0 ? Math.round((price.confirmed_count / total) * 100) : 50
 
   return (
     <div className="price-card card">
-      <div className="fuel-type-pill">{FUEL_LABELS[price.fuelType] || price.fuelType}</div>
+      <div className="fuel-type-pill">{FUEL_LABELS[price.fuel_type] || price.fuel_type}</div>
       <div className="price-value">{price.price}<span className="price-unit">c/L</span></div>
       <div className="price-meta">
-        <span>{timeAgo(price.updatedAt || price.createdAt)}</span>
-        {price.source && <span className="price-source">{price.source}</span>}
+        <span>{timeAgo(price.updated_at || price.created_at)}</span>
+        {price.is_verified ? <span className="price-source">✓ Verified</span> : null}
       </div>
       <div className="confidence-bar">
         <div className="confidence-fill" style={{ width: `${confidence}%` }} />
@@ -36,7 +36,7 @@ export default function PriceCard({ price, onVote }) {
         <button className="btn btn-sm vote-btn confirm" onClick={() => onVote(id, 'confirm')} title="Confirm price">
           👍
         </button>
-        <button className="btn btn-sm vote-btn incorrect" onClick={() => onVote(id, 'incorrect')} title="Mark as incorrect">
+        <button className="btn btn-sm vote-btn incorrect" onClick={() => onVote(id, 'deny')} title="Mark as incorrect">
           👎
         </button>
       </div>

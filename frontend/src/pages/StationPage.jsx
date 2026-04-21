@@ -7,8 +7,7 @@ import PriceSubmitModal from '../components/PriceSubmitModal'
 import './StationPage.css'
 
 const FUEL_COLORS = {
-  U91: '#2D6A4F', U95: '#52B788', U98: '#1B4332',
-  Diesel: '#FFC107', E10: '#17A2B8', LPG: '#6F42C1'
+  unleaded: '#2D6A4F', premium: '#52B788', diesel: '#FFC107', e10: '#17A2B8'
 }
 
 function formatDate(dateStr) {
@@ -27,10 +26,11 @@ export default function StationPage() {
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([api.getStation(id), api.getPriceHistory(id)])
-      .then(([stationData, histData]) => {
-        setStation(stationData)
-        setHistory(Array.isArray(histData) ? histData : histData.history || [])
+    api.getStation(id)
+      .then(stationRes => {
+        const s = stationRes.data || stationRes
+        setStation(s)
+        setHistory(s.history || [])
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
@@ -42,21 +42,27 @@ export default function StationPage() {
 
   const handleSuccess = () => {
     setShowModal(false)
-    api.getStation(id).then(setStation).catch(() => {})
+    api.getStation(id).then(res => {
+      const s = res.data || res
+      setStation(s)
+      setHistory(s.history || [])
+    }).catch(() => {})
   }
 
   if (loading) return <div className="loading" style={{ marginTop: 80 }}>Loading station...</div>
   if (error) return <div className="error-msg" style={{ margin: '80px 24px 0' }}>{error}</div>
   if (!station) return null
 
-  const fuelTypes = [...new Set(history.map(h => h.fuelType))]
+  const fuelTypes = [...new Set(history.map(h => h.fuel_type))]
   const chartData = history.reduce((acc, h) => {
-    const date = formatDate(h.recordedAt || h.createdAt)
+    const date = formatDate(h.created_at)
     let entry = acc.find(e => e.date === date)
     if (!entry) { entry = { date }; acc.push(entry) }
-    entry[h.fuelType] = h.price
+    entry[h.fuel_type] = h.price
     return acc
   }, [])
+
+  const pricesArray = Object.values(station.prices || {})
 
   return (
     <div className="station-page">
@@ -71,10 +77,10 @@ export default function StationPage() {
       </div>
 
       <div className="price-grid">
-        {(station.prices || []).map(price => (
-          <PriceCard key={price._id || price.id || price.fuelType} price={price} onVote={handleVote} />
+        {pricesArray.map(price => (
+          <PriceCard key={price.id || price.fuel_type} price={price} onVote={handleVote} />
         ))}
-        {(!station.prices || station.prices.length === 0) && (
+        {pricesArray.length === 0 && (
           <p className="empty-state">No prices reported yet.</p>
         )}
       </div>

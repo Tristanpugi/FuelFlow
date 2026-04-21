@@ -15,12 +15,10 @@ delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow })
 
 const FUEL_TYPES = [
-  { label: 'Unleaded 91', value: 'U91' },
-  { label: 'Unleaded 95', value: 'U95' },
-  { label: 'Unleaded 98', value: 'U98' },
-  { label: 'Diesel', value: 'Diesel' },
-  { label: 'E10', value: 'E10' },
-  { label: 'LPG', value: 'LPG' },
+  { label: 'Unleaded', value: 'unleaded' },
+  { label: 'Premium', value: 'premium' },
+  { label: 'Diesel', value: 'diesel' },
+  { label: 'E10', value: 'e10' },
 ]
 
 function RecenterMap({ center }) {
@@ -33,7 +31,7 @@ function RecenterMap({ center }) {
 
 export default function MapPage() {
   const [stations, setStations] = useState([])
-  const [fuelType, setFuelType] = useState('U91')
+  const [fuelType, setFuelType] = useState('unleaded')
   const [sortBy, setSortBy] = useState('price')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -51,8 +49,8 @@ export default function MapPage() {
   useEffect(() => {
     setLoading(true)
     setError('')
-    api.getStations({ fuelType, sortBy })
-      .then(data => setStations(Array.isArray(data) ? data : data.stations || []))
+    api.getStations({ fuel_type: fuelType, sort: sortBy })
+      .then(data => setStations(data.data || []))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [fuelType, sortBy])
@@ -63,8 +61,7 @@ export default function MapPage() {
   }
 
   const getPrice = (station) => {
-    const prices = station.prices || []
-    const p = prices.find(p => p.fuelType === fuelType)
+    const p = station.prices && station.prices[fuelType]
     return p ? `${p.price}c` : 'N/A'
   }
 
@@ -130,8 +127,8 @@ export default function MapPage() {
           onClose={() => setShowModal(false)}
           onSuccess={() => {
             setShowModal(false)
-            api.getStations({ fuelType, sortBy })
-              .then(data => setStations(Array.isArray(data) ? data : data.stations || []))
+            api.getStations({ fuel_type: fuelType, sort: sortBy })
+              .then(data => setStations(data.data || []))
               .catch(() => {})
           }}
         />

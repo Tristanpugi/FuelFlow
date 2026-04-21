@@ -5,12 +5,10 @@ import * as api from '../services/api'
 import './AlertsPage.css'
 
 const FUEL_TYPES = [
-  { label: 'Unleaded 91', value: 'U91' },
-  { label: 'Unleaded 95', value: 'U95' },
-  { label: 'Unleaded 98', value: 'U98' },
-  { label: 'Diesel', value: 'Diesel' },
-  { label: 'E10', value: 'E10' },
-  { label: 'LPG', value: 'LPG' },
+  { label: 'Unleaded', value: 'unleaded' },
+  { label: 'Premium', value: 'premium' },
+  { label: 'Diesel', value: 'diesel' },
+  { label: 'E10', value: 'e10' },
 ]
 
 function timeAgo(dateStr) {
@@ -28,7 +26,7 @@ export default function AlertsPage() {
   const navigate = useNavigate()
   const [alerts, setAlerts] = useState([])
   const [notifications, setNotifications] = useState([])
-  const [form, setForm] = useState({ fuelType: 'U91', targetPrice: '', city: '' })
+  const [form, setForm] = useState({ fuel_type: 'unleaded', target_price: '', city: '' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -37,8 +35,8 @@ export default function AlertsPage() {
     if (!isAuthenticated) { navigate('/login'); return }
     Promise.all([api.getAlerts(), api.getNotifications()])
       .then(([a, n]) => {
-        setAlerts(Array.isArray(a) ? a : a.alerts || [])
-        setNotifications(Array.isArray(n) ? n : n.notifications || [])
+        setAlerts(a.data || [])
+        setNotifications(n.data || [])
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
@@ -50,9 +48,9 @@ export default function AlertsPage() {
     e.preventDefault()
     setError(''); setSuccess('')
     try {
-      const newAlert = await api.createAlert({ ...form, targetPrice: Number(form.targetPrice) })
-      setAlerts(a => [...a, newAlert])
-      setForm({ fuelType: 'U91', targetPrice: '', city: '' })
+      const res = await api.createAlert({ ...form, target_price: Number(form.target_price) })
+      setAlerts(a => [...a, res.data])
+      setForm({ fuel_type: 'unleaded', target_price: '', city: '' })
       setSuccess('Alert created!')
       setTimeout(() => setSuccess(''), 3000)
     } catch (err) { setError(err.message) }
@@ -61,14 +59,14 @@ export default function AlertsPage() {
   const handleDelete = async (id) => {
     try {
       await api.deleteAlert(id)
-      setAlerts(a => a.filter(x => (x._id || x.id) !== id))
+      setAlerts(a => a.filter(x => x.id !== id))
     } catch (err) { setError(err.message) }
   }
 
   const handleMarkRead = async (id) => {
     try {
       await api.markNotificationRead(id)
-      setNotifications(n => n.map(x => (x._id || x.id) === id ? { ...x, read: true } : x))
+      setNotifications(n => n.map(x => x.id === id ? { ...x, is_read: true } : x))
     } catch {}
   }
 
@@ -87,7 +85,7 @@ export default function AlertsPage() {
             <form onSubmit={handleCreate}>
               <div className="form-group">
                 <label>Fuel Type</label>
-                <select name="fuelType" value={form.fuelType} onChange={handleChange}>
+              <select name="fuel_type" value={form.fuel_type} onChange={handleChange}>
                   {FUEL_TYPES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
