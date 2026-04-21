@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="et">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FuelFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Outfit:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <nav class="menu card">
+        <div class="menu-brand"><img src="/static/nav-logo.svg" alt="FuelFlow" class="menu-logo"/></div>
+        <div class="menu-links">
+          <a href="#lemmikud">Lemmikud</a>
+          <button id="openAlertModalBtn" class="menu-link-btn" type="button">Hinnateavitus</button>
+        </div>
+        <button id="refreshBtn" class="btn refresh-btn" type="button">↻ Värskenda</button>
+        <div id="userMenu" class="user-menu hidden">
+          <span id="userNameLabel" class="user-name"></span>
+          <button id="logoutBtn" class="menu-link-btn" type="button">Logi välja</button>
+        </div>
+        <a href="/login" id="loginLink" class="btn refresh-btn">Logi sisse</a>
+      </nav>
+
+      <p id="systemMessage" class="hint center-hint"></p>
+
+      <section id="kaart" class="map-center">
+        <div class="map-shell card strong-shadow">
+          <div id="map"></div>
+        </div>
+      </section>
+
+      <section class="bottom-grid">
+        <section class="card panel" id="muuda-hindu">
+          <h2>Kasutamine</h2>
+          <p class="hint">1. Vajuta kaardil tankla pinni peale.</p>
+          <p class="hint">2. Väikses aknas näed Diisel / 95 / 98 hindu.</p>
+          <p class="hint">3. Vajuta “Muuda hinda”, et avada suurem muutmisaken.</p>
+          <p class="hint">4. “Lisa lemmikutesse” lisab tankla lemmikute plokki ja pinile tähe.</p>
+        </section>
+
+        <section class="card panel" id="lemmikud">
+          <h2>Lemmikud</h2>
+          <div id="favoritesList" class="favorites-list"></div>
+        </section>
+
+        <section class="card panel" id="hinnateavitus">
+          <h2>Hinnateavitus</h2>
+          <p class="hint">Määra oma sihthinnad ja kui mõni tankla langeb alla nende, ilmub pinile roheline linnuke.</p>
+          <button id="checkAlertsBtn" class="btn" type="button">Muuda sihthindu</button>
+          <div id="alertsFeed" class="alerts-feed"></div>
+        </section>
+      </section>
+
+      <div id="alertModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="alertModalTitle">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3 id="alertModalTitle">Hinnateavituse seaded</h3>
+            <button id="closeAlertModalBtn" class="modal-close" type="button">Sulge</button>
+          </div>
+          <form id="alertTargetsForm" class="form-grid">
+            <label>
+              Diisel (max hind)
+              <input id="targetDiesel" type="number" step="0.001" min="0" placeholder="nt 1.600" />
+            </label>
+            <label>
+              95 (max hind)
+              <input id="target95" type="number" step="0.001" min="0" placeholder="nt 1.700" />
+            </label>
+            <label>
+              98 (max hind)
+              <input id="target98" type="number" step="0.001" min="0" placeholder="nt 1.800" />
+            </label>
+            <button class="btn" type="submit">Salvesta teavitus</button>
+          </form>
+          <p id="alertModalResult" class="hint"></p>
+        </div>
+      </div>
+
+      <div id="stationModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stationModalTitle">
+        <div class="modal-card station-modal-card">
+          <div class="modal-header">
+            <h3 id="stationModalTitle">Tankla hinnad</h3>
+            <button id="closeStationModalBtn" class="modal-close" type="button">Sulge</button>
+          </div>
+          <p id="stationModalAddress" class="hint"></p>
+          <div class="station-price-grid">
+            <label>
+              Diisel
+              <input id="stationPriceDiesel" type="number" step="0.001" min="0" disabled />
+            </label>
+            <label>
+              95
+              <input id="stationPrice95" type="number" step="0.001" min="0" disabled />
+            </label>
+            <label>
+              98
+              <input id="stationPrice98" type="number" step="0.001" min="0" disabled />
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button id="stationUpdateBtn" class="btn" type="button">Uuenda hindasid</button>
+            <button id="stationSaveBtn" class="btn" type="button" disabled>Salvesta muudatused</button>
+            <button id="stationFavoriteBtn" class="btn secondary-action" type="button">Pane lemmikutesse</button>
+          </div>
+          <p id="stationModalResult" class="hint"></p>
+        </div>
+      </div>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="/static/main.js"></script>
+  </body>
+</html>

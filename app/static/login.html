@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="et">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FuelFlow — Sisselogimine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --accent: #FF7A00;
+        --accent-hover: #e86e00;
+        --border: #e5e9f0;
+        --muted: #6b7280;
+        --ink: #111827;
+        --radius: 14px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: "Outfit", sans-serif;
+        background: #f4f6fa;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.10);
+        padding: 2.5rem 2rem;
+        width: min(420px, 100%);
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-bottom: 1.75rem;
+      }
+      .logo img { height: 36px; }
+      .tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.25rem;
+        background: #f3f4f6;
+        border-radius: 999px;
+        padding: 0.25rem;
+        margin-bottom: 1.75rem;
+      }
+      .tab-btn {
+        border: none;
+        background: transparent;
+        border-radius: 999px;
+        padding: 0.5rem;
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--muted);
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+      }
+      .tab-btn.active {
+        background: #fff;
+        color: var(--ink);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        margin-bottom: 0.85rem;
+      }
+      label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      input {
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 0.6rem 0.75rem;
+        font: inherit;
+        font-size: 0.95rem;
+        background: #fafbfc;
+        color: var(--ink);
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(255,122,0,0.1);
+        background: #fff;
+      }
+      .btn {
+        width: 100%;
+        border: none;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 0.7rem 1rem;
+        cursor: pointer;
+        margin-top: 0.5rem;
+        transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
+      }
+      .btn:hover {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(255,122,0,0.28);
+      }
+      .btn:active { transform: translateY(0); }
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1.1rem 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+      .divider::before, .divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+      .google-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        border: 1.5px solid var(--border);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        transition: background 0.15s, box-shadow 0.15s;
+      }
+      .google-btn:hover {
+        background: #f9fafb;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      }
+      .google-btn svg { flex-shrink: 0; }
+      #errorMsg {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        min-height: 1.2em;
+        text-align: center;
+      }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="logo">
+        <img src="/static/nav-logo.svg" alt="FuelFlow" />
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" id="tabLogin" type="button">Sisselogimine</button>
+        <button class="tab-btn" id="tabRegister" type="button">Registreerimine</button>
+      </div>
+
+      <!-- Login form -->
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginEmail">E-mail</label>
+          <input id="loginEmail" type="email" autocomplete="email" placeholder="sinu@email.com" required />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Parool</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" required />
+        </div>
+        <button class="btn" type="submit">Logi sisse</button>
+        <div class="divider">või</div>
+        <button class="google-btn" type="button" id="googleLoginBtn">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+          Jätka Google'iga
+        </button>
+        <p id="errorMsg"></p>
+      </form>
+
+      <!-- Register form -->
+      <form id="registerForm" class="hidden">
+        <div class="form-group">
+          <label for="regName">Nimi</label>
+          <input id="regName" type="text" autocomplete="name" placeholder="Sinu nimi" required />
+        </div>
+        <div class="form-group">
+          <label for="regEmail">E-mail</label>
+          <input id="regEmail" type="email" autocomplete="email" placeholder="sinu@email.com" required />
+        </div>
+        <div class="form-group">
+          <label for="regPassword">Parool (min 6 tähemärki)</label>
+          <input id="regPassword" type="password" autocomplete="new-password" placeholder="••••••••" required minlength="6" />
+        </div>
+        <button class="btn" type="submit">Loo konto</button>
+        <div class="divider">või</div>
+        <button class="google-btn" type="button" id="googleRegBtn">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+          Registreeru Google'iga
+        </button>
+        <p id="errorMsg2"></p>
+      </form>
+    </div>
+
+    <script>
+      const tabLogin = document.getElementById("tabLogin");
+      const tabRegister = document.getElementById("tabRegister");
+      const loginForm = document.getElementById("loginForm");
+      const registerForm = document.getElementById("registerForm");
+
+      tabLogin.addEventListener("click", () => {
+        tabLogin.classList.add("active");
+        tabRegister.classList.remove("active");
+        loginForm.classList.remove("hidden");
+        registerForm.classList.add("hidden");
+      });
+
+      tabRegister.addEventListener("click", () => {
+        tabRegister.classList.add("active");
+        tabLogin.classList.remove("active");
+        registerForm.classList.remove("hidden");
+        loginForm.classList.add("hidden");
+      });
+
+      function saveAndRedirect(data) {
+        localStorage.setItem("ff-token", data.token);
+        localStorage.setItem("ff-user-name", data.name);
+        localStorage.setItem("ff-user-email", data.email);
+        window.location.href = "/";
+      }
+
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const err = document.getElementById("errorMsg");
+        err.textContent = "";
+        try {
+          const res = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: document.getElementById("loginEmail").value,
+              password: document.getElementById("loginPassword").value,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) { err.textContent = data.detail || "Viga"; return; }
+          saveAndRedirect(data);
+        } catch {
+          err.textContent = "Ühenduse viga";
+        }
+      });
+
+      registerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const err = document.getElementById("errorMsg2");
+        err.textContent = "";
+        try {
+          const res = await fetch("/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: document.getElementById("regName").value,
+              email: document.getElementById("regEmail").value,
+              password: document.getElementById("regPassword").value,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) { err.textContent = data.detail || "Viga"; return; }
+          saveAndRedirect(data);
+        } catch {
+          err.textContent = "Ühenduse viga";
+        }
+      });
+
+      document.getElementById("googleLoginBtn").addEventListener("click", () => {
+        window.location.href = "/auth/google";
+      });
+
+      document.getElementById("googleRegBtn").addEventListener("click", () => {
+        window.location.href = "/auth/google";
+      });
+
+      // Handle Google OAuth redirect back with token
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("token")) {
+        saveAndRedirect({ token: params.get("token"), name: params.get("name") || "", email: "" });
+      }
+    </script>
+  </body>
+</html>

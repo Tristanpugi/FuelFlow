@@ -1,0 +1,12 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FuelFlow logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF8A00"/>
+      <stop offset="100%" stop-color="#FF6A00"/>
+    </linearGradient>
+  </defs>
+  <rect x="80" y="80" width="864" height="864" rx="220" fill="url(#bg)"/>
+  <path d="M512 220C512 220 338 428 338 580C338 676 414 756 512 756C610 756 686 676 686 580C686 428 512 220 512 220Z" fill="#FFFFFF"/>
+  <path d="M466 525C514 498 586 502 632 532" stroke="#FF7A00" stroke-width="38" stroke-linecap="round" fill="none"/>
+  <path d="M438 600C503 564 594 571 659 611" stroke="#FF7A00" stroke-width="30" stroke-linecap="round" fill="none"/>
+</svg>

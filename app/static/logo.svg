@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160" width="400" height="160">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1C1F2B"/>
+      <stop offset="100%" style="stop-color:#23273a"/>
+    </linearGradient>
+    <linearGradient id="pump-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFa040"/>
+      <stop offset="100%" style="stop-color:#FF7A00"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="400" height="160" rx="20" fill="url(#bg1)"/>
+
+  <!-- Fuel pump body -->
+  <g transform="translate(28, 20)">
+    <!-- Pump cabinet -->
+    <rect x="4" y="20" width="44" height="60" rx="6" fill="none" stroke="url(#pump-grad)" stroke-width="3.5"/>
+    <!-- Display screen -->
+    <rect x="10" y="26" width="32" height="18" rx="3" fill="#FF7A00" opacity="0.15"/>
+    <rect x="10" y="26" width="32" height="18" rx="3" fill="none" stroke="#FF7A00" stroke-width="1.5" opacity="0.6"/>
+    <!-- Price digits on screen -->
+    <text x="26" y="39" text-anchor="middle" font-family="monospace" font-size="9" fill="#FF7A00" font-weight="bold">1.649</text>
+    <!-- Keypad dots -->
+    <circle cx="16" cy="54" r="2" fill="#FF7A00" opacity="0.5"/>
+    <circle cx="26" cy="54" r="2" fill="#FF7A00" opacity="0.5"/>
+    <circle cx="36" cy="54" r="2" fill="#FF7A00" opacity="0.5"/>
+    <circle cx="16" cy="63" r="2" fill="#FF7A00" opacity="0.5"/>
+    <circle cx="26" cy="63" r="2" fill="#FF7A00" opacity="0.5"/>
+    <circle cx="36" cy="63" r="2" fill="#FF7A00" opacity="0.5"/>
+    <!-- Pump base -->
+    <rect x="0" y="80" width="52" height="6" rx="3" fill="#FF7A00" opacity="0.4"/>
+    <!-- Hose arm -->
+    <path d="M48 30 Q62 30 62 44 Q62 58 52 58" stroke="url(#pump-grad)" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- Nozzle -->
+    <rect x="46" y="55" width="12" height="6" rx="3" fill="url(#pump-grad)"/>
+    <!-- Top vent -->
+    <rect x="16" y="14" width="20" height="6" rx="3" fill="#FF7A00" opacity="0.3"/>
+  </g>
+
+  <!-- Brand name -->
+  <text x="118" y="82" font-family="'Space Grotesk', Arial, sans-serif" font-size="46" font-weight="700" fill="#FFFFFF" letter-spacing="-1">Fuel</text>
+  <text x="234" y="82" font-family="'Space Grotesk', Arial, sans-serif" font-size="46" font-weight="700" fill="#FF7A00" letter-spacing="-1">Flow</text>
+
+  <!-- Tagline -->
+  <text x="118" y="108" font-family="'Outfit', Arial, sans-serif" font-size="14" fill="#8892aa" letter-spacing="2.5">KÜTUSEHINDADE KAART</text>
+
+  <!-- Decorative flow lines -->
+  <line x1="118" y1="118" x2="370" y2="118" stroke="#FF7A00" stroke-width="1.5" opacity="0.3"/>
+  <line x1="118" y1="122" x2="310" y2="122" stroke="#FF7A00" stroke-width="1" opacity="0.15"/>
+</svg>

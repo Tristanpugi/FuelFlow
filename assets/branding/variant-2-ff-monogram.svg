@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1C1F2B"/>
+      <stop offset="100%" style="stop-color:#23273a"/>
+    </linearGradient>
+    <linearGradient id="orange2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFa040"/>
+      <stop offset="100%" style="stop-color:#FF7A00"/>
+    </linearGradient>
+    <clipPath id="circle-clip">
+      <circle cx="80" cy="80" r="70"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="80" cy="80" r="80" fill="url(#bg2)"/>
+  <circle cx="80" cy="80" r="70" fill="none" stroke="#FF7A00" stroke-width="3" opacity="0.25"/>
+
+  <!-- FF Monogram -->
+  <!-- First F -->
+  <text x="22" y="105" font-family="'Space Grotesk', Arial Black, sans-serif"
+        font-size="72" font-weight="800" fill="url(#orange2)" opacity="1">F</text>
+  <!-- Second F — slightly offset, lighter -->
+  <text x="68" y="105" font-family="'Space Grotesk', Arial Black, sans-serif"
+        font-size="72" font-weight="800" fill="#FFFFFF" opacity="0.9">F</text>
+
+  <!-- Flow arrow underneath -->
+  <path d="M30 118 Q80 130 130 118" stroke="#FF7A00" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <polygon points="126,113 135,118 126,123" fill="#FF7A00" opacity="0.6"/>
+
+  <!-- Fuel drop top-right accent -->
+  <path d="M128 28 Q128 18 120 18 Q112 18 112 28 Q112 38 120 42 Q128 38 128 28 Z"
+        fill="url(#orange2)" opacity="0.8"/>
+</svg>
