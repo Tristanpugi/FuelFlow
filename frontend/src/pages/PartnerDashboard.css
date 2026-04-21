@@ -1,0 +1,81 @@
+.partner-page {
+  max-width: 1000px;
+  margin: 80px auto 40px;
+  padding: 0 24px;
+}
+
+.partner-page h1 {
+  margin-bottom: 24px;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.chart-card {
+  margin-bottom: 24px;
+}
+
+.chart-card h3 {
+  margin: 0 0 16px;
+}
+
+.partner-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 640px) {
+  .partner-layout, .stats-row { grid-template-columns: 1fr; }
+}
+
+.stations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.partner-station-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.station-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.station-addr {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.last-update {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}

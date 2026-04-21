@@ -1,0 +1,47 @@
+.station-page {
+  max-width: 900px;
+  margin: 80px auto 40px;
+  padding: 0 24px;
+}
+
+.station-header {
+  margin-bottom: 24px;
+}
+
+.back-btn {
+  margin-bottom: 16px;
+}
+
+.station-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.station-title h1 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text);
+}
+
+.station-address {
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  margin-bottom: 24px;
+}
+
+.chart-card h3 {
+  margin: 0 0 16px;
+}
