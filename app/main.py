@@ -230,6 +230,29 @@ def require_account(
     return account
 
 
+def ensure_user_alert_targets_schema(conn: DBConnection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_alert_targets (
+            account_id BIGINT PRIMARY KEY,
+            diesel REAL,
+            premium95 REAL,
+            premium98 REAL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+    for definition in ("diesel REAL", "premium95 REAL", "premium98 REAL", "updated_at TEXT"):
+        try:
+            conn.execute(f"ALTER TABLE user_alert_targets ADD COLUMN {definition}")
+        except Exception as exc:
+            message = str(exc).lower()
+            if "duplicate column" in message or "already exists" in message:
+                continue
+            raise
+
+
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     r = 6371.0
     p1 = math.radians(lat1)
@@ -929,7 +952,11 @@ def remove_favorite(station_id: int, account: dict = Depends(require_account)) -
 @app.get("/api/me/alert-targets")
 def get_alert_targets(account: dict = Depends(require_account)) -> dict:
     conn = get_conn()
-    row = conn.execute("SELECT * FROM user_alert_targets WHERE account_id = ?", (account["id"],)).fetchone()
+    ensure_user_alert_targets_schema(conn)
+    row = conn.execute(
+        "SELECT diesel, premium95, premium98 FROM user_alert_targets WHERE account_id = ?",
+        (account["id"],),
+    ).fetchone()
     conn.close()
     if row is None:
         return {"diesel": None, "premium95": None, "premium98": None}
@@ -939,18 +966,28 @@ def get_alert_targets(account: dict = Depends(require_account)) -> dict:
 @app.put("/api/me/alert-targets")
 def set_alert_targets(body: UserAlertTargetsIn, account: dict = Depends(require_account)) -> dict:
     conn = get_conn()
-    conn.execute(
-        """
-        INSERT INTO user_alert_targets (account_id, diesel, premium95, premium98, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(account_id) DO UPDATE SET
-            diesel = excluded.diesel,
-            premium95 = excluded.premium95,
-            premium98 = excluded.premium98,
-            updated_at = excluded.updated_at
-        """,
-        (account["id"], body.diesel, body.premium95, body.premium98, now_iso()),
-    )
+    ensure_user_alert_targets_schema(conn)
+    existing = conn.execute(
+        "SELECT account_id FROM user_alert_targets WHERE account_id = ?",
+        (account["id"],),
+    ).fetchone()
+    if existing is None:
+        conn.execute(
+            """
+            INSERT INTO user_alert_targets (account_id, diesel, premium95, premium98, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (account["id"], body.diesel, body.premium95, body.premium98, now_iso()),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE user_alert_targets
+            SET diesel = ?, premium95 = ?, premium98 = ?, updated_at = ?
+            WHERE account_id = ?
+            """,
+            (body.diesel, body.premium95, body.premium98, now_iso(), account["id"]),
+        )
     conn.commit()
     conn.close()
     return {"ok": True}
