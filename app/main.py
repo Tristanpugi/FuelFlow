@@ -161,7 +161,11 @@ class DBConnection:
         return DBCursor(cursor, lastrowid=lastrowid)
 
     def executemany(self, query: str, params_seq: list[tuple[Any, ...]] | tuple[tuple[Any, ...], ...]) -> Any:
-        return self._conn.executemany(self._rewrite_query(query), params_seq)
+        rewritten_query = self._rewrite_query(query)
+        if self.backend == "postgres":
+            with self._conn.cursor() as cursor:
+                return cursor.executemany(rewritten_query, params_seq)
+        return self._conn.executemany(rewritten_query, params_seq)
 
     def commit(self) -> None:
         self._conn.commit()
@@ -651,7 +655,7 @@ def init_db() -> None:
                 INSERT INTO stations (brand_name, station_name, address, city, latitude, longitude, is_partner_verified)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (brand, station_name, address, city, lat, lng, is_partner_verified),
+                (brand, station_name, address, city, lat, lng, bool(is_partner_verified)),
             )
             station_id = int(cursor.lastrowid)
             if brand not in first_partner_station:
