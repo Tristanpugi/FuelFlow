@@ -1,0 +1,75 @@
+.map-page {
+  display: flex;
+  height: calc(100vh - 60px);
+  margin-top: 60px;
+}
+
+.map-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.station-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.station-list-item {
+  display: block;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.station-list-item:hover {
+  background: #f0faf4;
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.station-list-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.station-list-address {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.station-list-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 20px;
+}

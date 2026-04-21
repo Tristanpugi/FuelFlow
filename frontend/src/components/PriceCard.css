@@ -1,0 +1,80 @@
+.price-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fuel-type-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  background: #d8f3dc;
+  color: var(--primary);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.price-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.price-unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.price-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.price-source {
+  background: var(--bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.confidence-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.confidence-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.vote-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.vote-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  flex: 1;
+  justify-content: center;
+}
+
+.vote-btn:hover {
+  background: var(--border);
+}

@@ -1,0 +1,40 @@
+.login-page {
+  padding-top: 80px;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 16px;
+}
+
+.login-card h2 {
+  margin: 0 0 20px;
+  color: var(--text);
+  text-align: center;
+}
+
+.login-toggle {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: var(--accent);
+}
