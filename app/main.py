@@ -12,6 +12,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
+import psycopg
+from psycopg.rows import dict_row
 from fastapi import FastAPI, Header, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
@@ -23,6 +25,7 @@ from passlib.context import CryptContext
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "fuelflow.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 STATIC_DIR = BASE_DIR / "static"
 ESTONIA_BRANDS = {"Circle K", "Alexela", "Olerex", "Neste"}
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -116,10 +119,65 @@ def parse_ts(value: str | None) -> datetime | None:
         return None
 
 
-def get_conn() -> sqlite3.Connection:
+def database_backend() -> str:
+    return "postgres" if DATABASE_URL else "sqlite"
+
+
+def normalize_database_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://") :]
+    return url
+
+
+class DBCursor:
+    def __init__(self, cursor: Any, lastrowid: int | None = None):
+        self._cursor = cursor
+        self.lastrowid = lastrowid
+
+    def fetchone(self) -> Any:
+        return self._cursor.fetchone()
+
+    def fetchall(self) -> list[Any]:
+        return self._cursor.fetchall()
+
+
+class DBConnection:
+    def __init__(self, conn: Any, backend: str):
+        self._conn = conn
+        self.backend = backend
+
+    def _rewrite_query(self, query: str) -> str:
+        if self.backend == "postgres":
+            return query.replace("?", "%s")
+        return query
+
+    def execute(self, query: str, params: tuple[Any, ...] | list[Any] = ()) -> DBCursor:
+        cursor = self._conn.execute(self._rewrite_query(query), params)
+        lastrowid = getattr(cursor, "lastrowid", None)
+        if self.backend == "postgres" and lastrowid is None and query.lstrip().upper().startswith("INSERT"):
+            lastrow = self._conn.execute("SELECT LASTVAL() AS id").fetchone()
+            if lastrow is not None:
+                lastrowid = int(lastrow["id"])
+        return DBCursor(cursor, lastrowid=lastrowid)
+
+    def executemany(self, query: str, params_seq: list[tuple[Any, ...]] | tuple[tuple[Any, ...], ...]) -> Any:
+        return self._conn.executemany(self._rewrite_query(query), params_seq)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def close(self) -> None:
+        self._conn.close()
+
+
+def get_conn() -> DBConnection:
+    if DATABASE_URL:
+        conn = psycopg.connect(normalize_database_url(DATABASE_URL), row_factory=dict_row)
+        return DBConnection(conn, "postgres")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    conn.execute("PRAGMA foreign_keys = ON")
+    return DBConnection(conn, "sqlite")
 
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -181,7 +239,7 @@ def verification_weight(source: str) -> float:
     return 0.7
 
 
-def verification_status(reports: list[sqlite3.Row], price: float) -> tuple[str, float]:
+def verification_status(reports: list[Any], price: float) -> tuple[str, float]:
     if not reports:
         return "pending", 0.5
 
@@ -202,7 +260,7 @@ def verification_status(reports: list[sqlite3.Row], price: float) -> tuple[str, 
     return "disputed", confidence
 
 
-def update_canonical_price(conn: sqlite3.Connection, station_id: int, fuel_type: str) -> None:
+def update_canonical_price(conn: DBConnection, station_id: int, fuel_type: str) -> None:
     recent_rows = conn.execute(
         """
         SELECT price, source, submitted_at
@@ -338,9 +396,8 @@ def generated_prices(lat: float, lng: float) -> tuple[float, float, float]:
     return diesel, e10, premium95
 
 
-def init_db() -> None:
-    conn = get_conn()
-    conn.executescript(
+def create_sqlite_schema(conn: DBConnection) -> None:
+    conn._conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -416,7 +473,7 @@ def init_db() -> None:
 
         CREATE TABLE IF NOT EXISTS accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            email TEXT NOT NULL UNIQUE,
             password_hash TEXT,
             name TEXT NOT NULL,
             google_id TEXT UNIQUE,
@@ -442,6 +499,120 @@ def init_db() -> None:
         );
         """
     )
+
+
+def create_postgres_schema(conn: DBConnection) -> None:
+    statements = [
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id BIGSERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            reputation_score REAL NOT NULL DEFAULT 0.5,
+            role TEXT NOT NULL DEFAULT 'driver'
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS stations (
+            id BIGSERIAL PRIMARY KEY,
+            brand_name TEXT NOT NULL,
+            station_name TEXT NOT NULL,
+            address TEXT NOT NULL,
+            city TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            is_partner_verified BOOLEAN NOT NULL DEFAULT FALSE
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS station_prices (
+            station_id BIGINT NOT NULL REFERENCES stations(id),
+            fuel_type TEXT NOT NULL,
+            price REAL NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(station_id, fuel_type)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS price_reports (
+            id BIGSERIAL PRIMARY KEY,
+            station_id BIGINT NOT NULL REFERENCES stations(id),
+            fuel_type TEXT NOT NULL,
+            user_id BIGINT REFERENCES users(id),
+            source TEXT NOT NULL,
+            price REAL NOT NULL,
+            confidence_score REAL NOT NULL,
+            verification_status TEXT NOT NULL,
+            submitted_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS price_confirmations (
+            id BIGSERIAL PRIMARY KEY,
+            report_id BIGINT NOT NULL REFERENCES price_reports(id),
+            user_id BIGINT NOT NULL REFERENCES users(id),
+            action TEXT NOT NULL,
+            corrected_price REAL,
+            created_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS alerts (
+            id BIGSERIAL PRIMARY KEY,
+            user_id BIGINT NOT NULL REFERENCES users(id),
+            fuel_type TEXT NOT NULL,
+            target_price_lte REAL NOT NULL,
+            radius_km REAL NOT NULL,
+            lat REAL NOT NULL,
+            lng REAL NOT NULL,
+            cooldown_minutes INTEGER NOT NULL,
+            last_notified_at TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS partner_keys (
+            station_id BIGINT PRIMARY KEY REFERENCES stations(id),
+            api_key TEXT NOT NULL UNIQUE
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS accounts (
+            id BIGSERIAL PRIMARY KEY,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT,
+            name TEXT NOT NULL,
+            google_id TEXT UNIQUE,
+            created_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user_favorites (
+            account_id BIGINT NOT NULL REFERENCES accounts(id),
+            station_id BIGINT NOT NULL REFERENCES stations(id),
+            added_at TEXT NOT NULL,
+            PRIMARY KEY (account_id, station_id)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user_alert_targets (
+            account_id BIGINT PRIMARY KEY REFERENCES accounts(id),
+            diesel REAL,
+            premium95 REAL,
+            premium98 REAL,
+            updated_at TEXT NOT NULL
+        )
+        """,
+    ]
+    for statement in statements:
+        conn.execute(statement)
+
+
+def init_db() -> None:
+    conn = get_conn()
+    if conn.backend == "postgres":
+        create_postgres_schema(conn)
+    else:
+        create_sqlite_schema(conn)
 
     user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
     if user_count == 0:
@@ -527,20 +698,21 @@ def login_page() -> FileResponse:
 @app.post("/auth/register")
 def register(body: RegisterIn) -> dict:
     conn = get_conn()
-    existing = conn.execute("SELECT id FROM accounts WHERE email = ?", (body.email,)).fetchone()
+    normalized_email = body.email.lower().strip()
+    existing = conn.execute("SELECT id FROM accounts WHERE email = ?", (normalized_email,)).fetchone()
     if existing:
         conn.close()
         raise HTTPException(status_code=409, detail="See e-mail on juba kasutusel")
     hashed = hash_password(body.password)
     cursor = conn.execute(
         "INSERT INTO accounts (email, password_hash, name, created_at) VALUES (?, ?, ?, ?)",
-        (body.email.lower().strip(), hashed, body.name.strip(), now_iso()),
+        (normalized_email, hashed, body.name.strip(), now_iso()),
     )
     account_id = int(cursor.lastrowid)
     conn.commit()
     conn.close()
     token = create_access_token(account_id)
-    return {"token": token, "name": body.name.strip(), "email": body.email.lower().strip()}
+    return {"token": token, "name": body.name.strip(), "email": normalized_email}
 
 
 @app.post("/auth/login")
@@ -656,7 +828,11 @@ def get_favorites(account: dict = Depends(require_account)) -> list[dict]:
 def add_favorite(body: FavoriteIn, account: dict = Depends(require_account)) -> dict:
     conn = get_conn()
     conn.execute(
-        "INSERT OR IGNORE INTO user_favorites (account_id, station_id, added_at) VALUES (?, ?, ?)",
+        """
+        INSERT INTO user_favorites (account_id, station_id, added_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(account_id, station_id) DO NOTHING
+        """,
         (account["id"], body.station_id, now_iso()),
     )
     conn.commit()

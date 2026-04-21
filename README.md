@@ -2,6 +2,8 @@
 
 FuelFlow is a real-time fuel price platform that helps drivers find the cheapest nearby gas stations, while allowing stations to publish verified official pricing.
 
+The app uses SQLite by default for local development. In production, set `DATABASE_URL` to switch automatically to PostgreSQL.
+
 ## Run The App
 
 1. Install dependencies:
@@ -27,7 +29,7 @@ uvicorn app.main:app --reload
 	- Partner push endpoint using API key authentication.
 	- Verification status assigned as verified, pending, or disputed.
 - Real-time storage:
-	- SQLite persistence for stations, reports, canonical prices, alerts, and confirmations.
+	- SQLite locally, PostgreSQL in production via `DATABASE_URL`.
 	- Staleness state computed from last update timestamps.
 - Interactive map + profiles:
 	- Leaflet map with nearby station markers.
@@ -54,6 +56,28 @@ Partner keys are auto-generated from the first station found for each brand:
 Use with header:
 
 - `X-API-Key: <key>`
+
+## PostgreSQL On Render
+
+`render.yaml` now provisions a managed Postgres database and injects its connection string into the web service as `DATABASE_URL`.
+
+Important notes:
+
+- Existing local SQLite data is not migrated automatically into Postgres.
+- On Render, new deploys should persist users, favorites, and alert targets in Postgres instead of the instance filesystem.
+- Locally, if `DATABASE_URL` is unset, the app still uses `app/fuelflow.db`.
+
+To copy existing local user data into Postgres after the database is created:
+
+```bash
+DATABASE_URL=<render-postgres-url> python scripts/migrate_sqlite_to_postgres.py
+```
+
+Optional source path override:
+
+```bash
+python scripts/migrate_sqlite_to_postgres.py --sqlite-path app/fuelflow.db --database-url <render-postgres-url>
+```
 
 ## What FuelFlow Needs To Build
 
