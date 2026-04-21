@@ -56,11 +56,6 @@ router.post(
 // GET /api/prices/history/:stationId
 router.get('/history/:stationId', (req, res) => {
   try {
-    // Mark prices older than 6 hours as outdated for this station
-    db.prepare(
-      "UPDATE fuel_prices SET is_outdated = 1 WHERE station_id = ? AND created_at < datetime('now', '-6 hours') AND is_outdated = 0"
-    ).run(req.params.stationId);
-
     const rows = db
       .prepare(
         "SELECT * FROM fuel_prices WHERE station_id = ? AND created_at >= datetime('now', '-30 days') ORDER BY created_at ASC"

@@ -66,7 +66,7 @@ router.get('/dashboard', (req, res) => {
     const cityAverages = {};
     for (const row of cityAvgRows) {
       if (!cityAverages[row.city]) cityAverages[row.city] = {};
-      cityAverages[row.city][row.fuel_type] = parseFloat(row.avg_price.toFixed(1));
+      cityAverages[row.city][row.fuel_type] = Math.round(row.avg_price * 10) / 10;
     }
 
     const totalWeeklySubmissions = db

@@ -3,6 +3,13 @@ const db = require('../database');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fuelflow-secret-key-change-in-production';
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('FATAL: JWT_SECRET environment variable must be set in production.');
+  process.exit(1);
+} else if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: JWT_SECRET is not set. Using insecure default. Set JWT_SECRET before deploying to production.');
+}
+
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
