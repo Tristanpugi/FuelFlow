@@ -396,6 +396,16 @@ def demo_fallback_stations() -> list[tuple[str, str, str, str, float, float, int
     ]
 
 
+def generated_prices(lat: float, lng: float) -> tuple[float, float, float]:
+    # Generate stable demo prices from coordinates so every station has an initial value.
+    # Users can update these via the app and they'll override these defaults.
+    variation = abs((lat * 1000 + lng * 700) % 11) / 1000
+    diesel = round(1.569 + variation, 3)
+    e10 = round(diesel + 0.04, 3)
+    premium95 = round(e10 + 0.06, 3)
+    return diesel, e10, premium95
+
+
 def create_sqlite_schema(conn: DBConnection) -> None:
     conn._conn.executescript(
         """
@@ -658,17 +668,22 @@ def init_db() -> None:
             if brand not in first_partner_station:
                 first_partner_station[brand] = station_id
 
+            diesel, e10, premium95 = generated_prices(lat, lng)
+            conn.executemany(
+                "INSERT INTO station_prices (station_id, fuel_type, price, updated_at) VALUES (?, ?, ?, ?)",
+                [
+                    (station_id, "diesel", diesel, now_iso()),
+                    (station_id, "e10", e10, now_iso()),
+                    (station_id, "premium95", premium95, now_iso()),
+                ],
+            )
+
         for brand, station_id in first_partner_station.items():
             key_value = f"partner-{brand.lower().replace(' ', '')}-demo-key"
             conn.execute(
                 "INSERT INTO partner_keys (station_id, api_key) VALUES (?, ?)",
                 (station_id, key_value),
             )
-
-    report_count = conn.execute("SELECT COUNT(*) as c FROM price_reports").fetchone()["c"]
-    if report_count == 0:
-        # Keep prices empty until users/partners submit the first reports.
-        conn.execute("DELETE FROM station_prices")
 
     conn.commit()
     conn.close()
